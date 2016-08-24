@@ -10,4 +10,12 @@
 		<model width="76.2" length="0">Versacamm SP-300</model>
 		<interface type="printer" />
 	</device>
+	<device>
+		<brand>HP-LaserJet-1018</brand>
+		<model width="58.4" length="0">HP-LaserJet-1018</model>
+		<interface type="printer" />
+	</device>
+
 </devices>
+
+

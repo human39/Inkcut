@@ -49,9 +49,9 @@ class InkscapeInkCutPlugin(inkex.Effect):
 			
 			InkscapePlugin(self.document,nodes.keys(),inkex)
 			"""
-			f = open('/home/rhino/projects/inkcut/app/tmp/inkscape.svg','w+')
+			f = open('/home/lex/.config/inkscape/extensions/inkcut/app/tmp/inkscape.svg','w+')
 			f.write(inkex.etree.tostring(self.document))
-			cmd = [sys.executable, '/home/rhino/projects/inkcut/app/main.py']
+			cmd = [sys.executable, '/home/lex/.config/inkscape/extensions/inkcut/app/main.py']
 			cmd.extend(nodes)
 			#stdout=open(os.devnull, 'w+')
 			p = subprocess.Popen(cmd, stdin=subprocess.PIPE, 

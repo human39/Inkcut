@@ -45,6 +45,8 @@ class Settings:
 						widget.set_active(item.get('val')=="true")
 					elif t == gtk.Adjustment:
 						widget.set_value(float(item.get('val')))
+					elif t == gtk.Entry:
+						widget.set_text( item.get('val') )
 					elif t==gtk.ComboBox or t==gtk.ComboBoxEntry: # will not load custom
 						widget.set_active(int(item.get('val')))
 					else:
@@ -82,6 +84,8 @@ class Settings:
 					item.set('val','false')
 			elif t == gtk.Adjustment:
 				item.set('val',str(widget.get_value()))
+			elif t == gtk.Entry:
+				item.set( 'val', widget.get_text() )
 			elif t==gtk.ComboBox or t==gtk.ComboBoxEntry: # will not load custom
 				item.set('val',str(widget.get_active()))
 			else:

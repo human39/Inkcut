@@ -59,7 +59,7 @@ class Device:
 			
 
 
-	def plot(self,filename):
+	def plot(self,filename, hpgl):
 		def toSerial(data,settings):
 			assert type(data) == str, "input data must be a str type"
 			import serial
@@ -90,12 +90,13 @@ class Device:
 			printer.close()
 			return True;
 		
-		
-		f=open(filename,'r')
+		if filename != None:	
+			f=open(filename,'r')
+			hpgl = f.read()
 		if self.interface=='printer':
-			toPrinter(f.read(),self.name)
+			toPrinter(hpgl,self.name)
 		elif self.interface=='serial':
-			toSerial(f.read(),self.serial)
+			toSerial(hpgl,self.serial)
 		else:
 			raise AssertionError('Invalid interface type, only printers and serial connections are supported.')
 		

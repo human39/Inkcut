@@ -30,6 +30,9 @@ import hpgl as HPGL
 from pprint import pprint
 import inkex
 
+
+import simplestyle
+
 units = {'in':90.0, 'pt':1.25, 'px':1, 'mm':3.5433070866, 'cm':35.433070866, 'm':3543.3070866,'km':3543307.0866, 'pc':15.0, 'yd':3240 , 'ft':1080}
 
 class Plot:
@@ -39,11 +42,14 @@ class Plot:
 			'cutSettings':False,
 			'velocity':4, # cm/s or in/s, depends on cutter
 			'force':80, # g
-			'scale':1016/units['in'], # according to inkscape & hpgl scale
+			'scale': 1016/units['in'], # according to inkscape & hpgl scale
 			'calibration':1, # scale adjustment if needed
 			'smoothness':.1*units['mm'], # 1 um
 			'overcut': units['mm'], # 1 mm
 			'offset':0,
+			'color_cut_combo': 'default_color',
+			'rotate': 0,
+			'concut1X': 0,
 			'copies':1,
 			'spacing':(.25*units['cm'],.25*units['cm']),
 			'startPosition':(0,4*units['mm']), # y pos = margin
@@ -62,23 +68,29 @@ class Plot:
 		for k,v in default.iteritems():
 			setattr(self,k,v)
 		#self.weedHorizontal = 
-		
+		import gtk
+#		message = gtk.MessageDialog(type=gtk.MESSAGE_ERROR, buttons=gtk.BUTTONS_OK)
+#		message.set_markup('rotate ' + str(self.rotate) )
+#		message.run()
+#		message.destroy()		
 	
 	# ------------- load graphic ---------------------------------
-	def loadGraphic(self,svgPathNodes): #todo multiple graphics?
-		self.graphic = Graphic(svgPathNodes)
-		
+	def loadGraphic(self,svgPathNodes, color): #todo multiple graphics?
+		self.graphic = Graphic(svgPathNodes, color, self.rotate)
+
 		# set graphic defaults
 		self.graphic.setPosition(self.startPosition)
 		self.graphic.setScale(self.scale)
 		self.graphic.setSmoothness(self.smoothness)
 		self.graphic.setOvercut(self.overcut)
 		self.graphic.setBladeOffset(self.offset)
+		self.graphic.setColor(self.color_cut_combo)
+
 		
 		# read new plot properties
 		self.data = self.getData()
 		self.size = self.getSize()
-	
+
 	def createTiledClones(self): #does a lot of work
 		# set some useful variables
 		start = self.startPosition
@@ -166,7 +178,7 @@ class Plot:
 		data = []
 		data.extend(self.graphic.data)
 		return data
-	
+
 	def getLength(self):
 		try:
 			l = self.graphic.length
@@ -189,7 +201,24 @@ class Plot:
 		self.copies = c
 		# update size
 		self.getSize()
-	
+
+	def setColor(self, color):
+		self.graphic.setColor(color)
+		# update color
+		self.getColor()	
+
+	def getColor(self):
+		color = self.color_cut_combo 
+		return color
+
+	def setConcut1X(self, value):
+		self.graphic.setConcut1X(value)
+		# update 1X
+		self.getConcut1X()
+	def getConcut1X(self):
+		value = self.concut1X 
+		return value	
+
 	def getStackSize(self):
 		limit = (self.dimensions[1]-self.startPosition[1]-self.margin)
 		size = self.graphic.size[1]
@@ -204,7 +233,7 @@ class Plot:
 	def setOvercut(self,d):
 		self.overcut = d
 		self.graphic.setOvercut(d)
-	
+
 	def setBladeOffset(self,d):
 		self.offset = d
 		self.graphic.setBladeOffset(d)
@@ -401,20 +430,71 @@ class Plot:
 		hpgl.append('PU%d,%d'%(self.finishPosition[0]*self.scale,self.finishPosition[1]*self.scale))
 		hpgl.extend(['IN'])
 		return ";".join(hpgl)+";"
+
+#['Normal plotlanguage (HPGL)','Other plotlanguage (DMPL)','Summa D620 (DMPL)','Jimeile (DMPL)','Other DMPL-plotters','GPGL-plotters (Graphtec)']
+
+	def toDMPL(self, hpgl, mode):
+		if hpgl == None :
+			hpgl = self.toHPGL()
+
+		if mode == 1 :
+			hpgl = hpgl.replace("IN;",";:HAEC1",1)
+			hpgl = hpgl.replace(";",",;")
+		elif mode == 2 :
+#SummaCut 620
+			hpgl = hpgl.replace("IN;"," ;:ECN A L0 ",1)
+			hpgl = hpgl.replace(";VS"," V",1) #velocity
+			hpgl = hpgl.replace(";FS"," BP",1) # pressure
+			hpgl = hpgl.replace(" SP1","",1)    #no pen select
+			hpgl = hpgl.replace(";IN;"," @ ",1)			
+			hpgl = hpgl.replace(";PD"," D") 
+			hpgl = hpgl.replace(";PU"," U")
+		elif mode == 3 :
+#jimeile		
+# no speed & force settings
+			hpgl = hpgl.replace("IN;"," ;:H A L0 ",1)
+			hpgl = hpgl.replace(" SP1"," EC1",1) #specify pen
+			hpgl = hpgl.replace(";IN;"," @ ",1)			
+			hpgl = hpgl.replace(";PD"," D") 
+			hpgl = hpgl.replace(";PU"," U") 		
+		elif mode == 4 :	
+#DMPL other		
+			hpgl = hpgl.replace("IN;"," ;:H A L0 ",1)
+			hpgl = hpgl.replace(";VS"," V",1)  #setting velocity
+			hpgl = hpgl.replace(" SP1"," EC1",1) #specify pen
+			hpgl = hpgl.replace(";IN;"," @ ",1)			
+			hpgl = hpgl.replace(";PD"," D") 
+			hpgl = hpgl.replace(";PU"," U")
+		return hpgl[1:]
+
+	def toGPGL(self, hpgl, mode):
+		if hpgl == None :
+			hpgl = self.toHPGL()
+		if mode == 5 :
+#Graphtec
+			hpgl = hpgl.replace("IN;","H",1)
+			hpgl = hpgl.replace("SP1","",1)    #no pen select
+			hpgl = hpgl.replace(";VS","!",1) #velocity
+			hpgl = hpgl.replace(";FS","*",1) # pressure
+			hpgl = hpgl.replace(";PU","M") #move without cutting
+			hpgl = hpgl.replace(";PD","D")  #move with cutting
+			hpgl = hpgl.replace(";IN;","",1) #endstring			
+		return hpgl[1:]
 	
 	
 class Graphic: # a group of paths
-	def __init__(self,svgElements):
-		self.data = self.toBasicPaths(self.fromSVG(svgElements))
+	def __init__(self,svgElements, color, rotate):
+		self.data = self.toBasicPaths(self.fromSVG(svgElements, color))
+		self.rotate = rotate
 		self.paths = self.toPathObjs()
 		self.mirror = [False,False]
 		self.bbox = self.boundingBox()
 		self.position = (0,0) # relative to starting position
 		self.size = self.getSize()
 		self.mirrorYAxis()
+		self.concut1X = 0
 		#self.length = self.getLength()
 		#self.getSize()
-		
 	
 	# --------------------------graphic properties --------------------------
 	def getLength(self):
@@ -424,13 +504,11 @@ class Graphic: # a group of paths
 		self.length = l
 		return l
 	
-	
 	def setBladeOffset(self,d):
 		self.offset = d
 		for path in self.paths:
 			path.setBladeOffset(d)
-		
-	
+
 	def setScale(self,s):
 		self.scale = s
 		for path in self.paths:
@@ -463,7 +541,12 @@ class Graphic: # a group of paths
 			path.translatePath(x,y)
 			# update new position
 		self.position = (x,y)
-	
+
+	def setColor(self,color):
+		self.color = color
+	def setConcut1X(self,value):
+		self.concut1X = value
+
 	def mirrorYAxis(self):
 		if not (self.mirror[1]):
 			self.mirror[1] = True
@@ -491,7 +574,7 @@ class Graphic: # a group of paths
 			except:
 				self.bbox = self.boundingBox()
 			return (self.bbox[0],self.bbox[2]) # minx, miny (top left corner?)
-	
+
 	def getSize(self):
 		try: 
 			self.bbox
@@ -511,7 +594,7 @@ class Graphic: # a group of paths
 	def toPathObjs(self): # makes path objects from basic path list
 		paths = []
 		for bp in self.data:
-			paths.append(Path(bp))
+			paths.append(Path(bp,{'rotate':self.rotate}))
 		return paths
 		
 	def toBasicPaths(self,spl): # break a complex path with subpaths into individual paths
@@ -526,7 +609,7 @@ class Graphic: # a group of paths
 		return bpl
 	
 	# --------------------------graphic import --------------------------
-	def fromSVG(self,nodes):
+	def fromSVG(self,nodes, color):
 		# takes in a list of lxml elements
 		# returns a list of inkscape compound simplepaths (paths in paths etc...)
 		# could possibly push up into Plot
@@ -534,7 +617,21 @@ class Graphic: # a group of paths
 		for node in nodes:
 			tag = node.tag[node.tag.rfind("}")+1:]
 			if tag == 'path':
-				spl.extend(simplepath.parsePath(node.get("d")))
+#				spl.extend(simplepath.parsePath(node.get("d")))
+#Cut by color
+				style_str = node.get( 'style' )
+				if style_str:
+					style = simplestyle.parseStyle( style_str )
+
+					if 'fill' in style:
+						f = style['fill']
+						color = str(color)
+						color_hex = color[-7:]
+						if ( f == str(color_hex) or  str(color_hex)== '#######' ):
+							spl.extend(simplepath.parsePath(node.get("d")))
+#/Cut by color
+
+
 			elif tag == 'rect':
 				# how do I convert rect to path??
 				raise AssertionError("Cannot handle '%s' objects, covert to rect's to path first."%(tag))
@@ -544,6 +641,9 @@ class Graphic: # a group of paths
 				spl.extend(self.fromSVG(list(node)))
 			else:
 				raise AssertionError("Cannot handle tag '%s'"%(tag))
+		if (len(spl) == 0 ):
+			raise AssertionError("No paths!","Last selected color: "+ color )
+			sys.exit(0)
 		return spl
 		
 	# --------------------------graphic export --------------------------
@@ -557,6 +657,7 @@ class Path: # a single path
 	def __init__(self,basicpath,settings={}):
 		default = {
 		'overcut':0,
+		'rotate':0,
 		'offset':0,
 		'smoothness':.1*units['mm'], # 1 um
 		'scale': 1016/units['in']
@@ -572,6 +673,11 @@ class Path: # a single path
 		#self.length = self.getPathLength()
 		#self.position = (self.bbox[0],self.bbox[2])
 		#self.scale = 11.288888889
+#LW2013 Contourcut
+#		import math
+		radial =  ( (self.rotate * (math.pi) )/180) 
+		self.rotatePath(radial,0,0)
+
 		
 	# --------------------------path adjustments --------------------------
 	
@@ -616,6 +722,9 @@ class Path: # a single path
 	# --------------------------path settings --------------------------	
 	def setSmoothness(self,s):
 		self.smoothness = s
+
+	def setRotate(self,degree):
+		self.rotate = degree
 	
 	def setScale(self,s):
 		self.scale = s
